@@ -7,9 +7,11 @@ import {
   uploadProductImage,
   deleteProductImage,
 } from '@/lib/services/productService';
+import { isAdminRequest } from '@/lib/session';
 
 // Server Action errors are masked in production builds, so failures are returned, not thrown.
 async function run(fn) {
+  if (!(await isAdminRequest())) return { ok: false, error: 'Your session has expired. Please sign in again.' };
   try {
     return { ok: true, data: await fn() };
   } catch (err) {

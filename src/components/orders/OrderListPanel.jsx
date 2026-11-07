@@ -1,25 +1,29 @@
 'use client';
 
 import { useState } from 'react';
+import { useParams } from 'next/navigation';
 import SearchInput from '@/components/ui/SearchInput';
 import OrderRow from './OrderRow';
 import { useSearch } from '@/hooks/useSearch';
 import { cn } from '@/lib/utils';
 
-const STATUS_FILTERS = ['all', 'pending', 'processing', 'completed', 'cancelled'];
+const STATUS_FILTERS = [
+  { value: 'all', label: 'All' },
+  { value: 'order_placed', label: 'Order placed' },
+  { value: 'in_transit', label: 'In transit' },
+  { value: 'delivered', label: 'Delivered' },
+];
+const SEARCH_KEYS = ['id', 'customer.name', 'customer.email', 'customer.phone'];
 
-export default function OrderListPanel({ orders, selectedId }) {
+export default function OrderListPanel({ orders }) {
+  const selectedId = useParams().id ?? null;
   const [statusFilter, setStatusFilter] = useState('all');
-  const { query, setQuery, filtered: searched } = useSearch(orders, [
-    'id',
-    'customerName',
-    'status',
-  ]);
+  const { query, setQuery, filtered: searched } = useSearch(orders, SEARCH_KEYS);
 
   const filtered =
     statusFilter === 'all'
       ? searched
-      : searched.filter((o) => o.status === statusFilter);
+      : searched.filter((o) => o.deliveryStatus === statusFilter);
 
   const sorted = [...filtered].sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
@@ -43,16 +47,16 @@ export default function OrderListPanel({ orders, selectedId }) {
         <div className="flex gap-1.5 mt-3 flex-wrap">
           {STATUS_FILTERS.map((s) => (
             <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
+              key={s.value}
+              onClick={() => setStatusFilter(s.value)}
               className={cn(
-                'px-2.5 py-0.5 rounded-full text-xs font-medium capitalize transition-colors',
-                statusFilter === s
+                'px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors',
+                statusFilter === s.value
                   ? 'bg-forest text-cream'
                   : 'bg-tan/20 text-brown hover:bg-tan/40'
               )}
             >
-              {s}
+              {s.label}
             </button>
           ))}
         </div>

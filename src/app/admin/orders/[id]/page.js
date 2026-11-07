@@ -1,22 +1,12 @@
 import { notFound } from 'next/navigation';
-import { getOrders, getOrder } from '@/lib/services/orderService';
-import OrderListPanel from '@/components/orders/OrderListPanel';
+import { getOrder } from '@/lib/services/orderService';
 import OrderDetail from '@/components/orders/OrderDetail';
 
 export default async function OrderDetailPage({ params }) {
   const { id } = await params;
-
-  const [orders, order] = await Promise.all([
-    getOrders(),
-    getOrder(id),
-  ]);
-
+  const order = await getOrder(id);
   if (!order) notFound();
 
-  return (
-    <div className="flex h-full">
-      <OrderListPanel orders={orders} selectedId={id} />
-      <OrderDetail order={order} />
-    </div>
-  );
+  // key: OrderDetail keeps the order in local state, so a new id must start fresh.
+  return <OrderDetail key={order.id} order={order} />;
 }

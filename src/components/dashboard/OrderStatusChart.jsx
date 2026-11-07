@@ -11,10 +11,9 @@ import {
 } from 'recharts';
 
 const COLORS = {
-  Completed: '#7B9E87',
-  Pending: '#9B8EC4',
-  Processing: '#C4A882',
-  Cancelled: '#d1856a',
+  'Order placed': '#9B8EC4',
+  'In transit': '#C4A882',
+  Delivered: '#7B9E87',
 };
 
 function CustomTooltip({ active, payload, label }) {
@@ -31,10 +30,9 @@ function CustomTooltip({ active, payload, label }) {
 
 export default function OrderStatusChart({ orders }) {
   const counts = {
-    Completed: orders.filter((o) => o.status === 'completed').length,
-    Pending: orders.filter((o) => o.status === 'pending').length,
-    Processing: orders.filter((o) => o.status === 'processing').length,
-    Cancelled: orders.filter((o) => o.status === 'cancelled').length,
+    'Order placed': orders.filter((o) => o.deliveryStatus === 'order_placed').length,
+    'In transit': orders.filter((o) => o.deliveryStatus === 'in_transit').length,
+    Delivered: orders.filter((o) => o.deliveryStatus === 'delivered').length,
   };
 
   const data = Object.entries(counts).map(([name, value]) => ({ name, value }));
@@ -42,7 +40,7 @@ export default function OrderStatusChart({ orders }) {
   return (
     <div className="bg-white rounded-xl p-5 border border-tan/30">
       <div className="mb-4">
-        <h3 className="text-sm font-semibold text-ink">Orders by Status</h3>
+        <h3 className="text-sm font-semibold text-ink">Orders by Delivery Status</h3>
         <p className="text-xs text-brown/50">All time</p>
       </div>
       <ResponsiveContainer width="100%" height={200}>

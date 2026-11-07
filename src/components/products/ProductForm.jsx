@@ -4,6 +4,8 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, ArrowLeft, Plus, X, ImagePlus, Upload, ChevronUp, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import {
@@ -27,6 +29,7 @@ const newDetail = (d = {}) => ({
 
 export default function ProductForm({ initialProduct }) {
   const isEdit = !!initialProduct;
+  const router = useRouter();
 
   const [form, setForm] = useState({
     title: initialProduct?.title ?? '',
@@ -38,7 +41,7 @@ export default function ProductForm({ initialProduct }) {
 
   // Images already saved on the server (can be deleted) and new files queued for upload.
   const [savedImages, setSavedImages] = useState(initialProduct?.images ?? []);
-  const [newImages, setNewImages] = useState([]); // [{ file, src }]
+  const [newImages, setNewImages] = useState([]); // [{ id, file, src }]
   const [imageNotice, setImageNotice] = useState(null);
   const fileRef = useRef(null);
 
@@ -92,7 +95,8 @@ export default function ProductForm({ initialProduct }) {
     setImageNotice(rejected.length ? rejected.join('; ') + '.' : null);
     accepted.forEach((file) => {
       const reader = new FileReader();
-      reader.onload = (e) => setNewImages((p) => [...p, { file, src: e.target.result }]);
+      reader.onload = (e) =>
+        setNewImages((p) => [...p, { id: `img_${seq++}`, file, src: e.target.result }]);
       reader.readAsDataURL(file);
     });
   }
@@ -131,18 +135,25 @@ export default function ProductForm({ initialProduct }) {
     }
 
     // The API takes one image per request. Report any that fail rather than losing the product.
-    const failed = [];
+    const uploaded = [];
+    const failedImages = [];
     for (const img of newImages) {
       const fd = new FormData();
       fd.append('file', img.file);
       const res = await uploadProductImageAction(saved.data.id, fd);
-      if (!res.ok) failed.push(`${img.file.name}: ${res.error}`);
+      if (res.ok) uploaded.push(res.data);
+      else failedImages.push({ img, error: res.error });
     }
+
+    // Keep the form in step with the server: uploaded images become "saved", failed ones stay queued.
+    setSavedImages((p) => [...p, ...uploaded]);
+    setNewImages(failedImages.map((f) => f.img));
+    router.refresh();
 
     setSuccess({
       title: saved.data.title,
-      uploaded: newImages.length - failed.length,
-      failed,
+      uploaded: uploaded.length,
+      failed: failedImages.map((f) => `${f.img.file.name}: ${f.error}`),
     });
     setSubmitting(false);
   }
@@ -153,6 +164,7 @@ export default function ProductForm({ initialProduct }) {
       setDetails([]);
     }
     setNewImages([]);
+    setSavedImages([]);
     setImageNotice(null);
     setSuccess(null);
     setSubmitError(null);
@@ -192,9 +204,7 @@ export default function ProductForm({ initialProduct }) {
         </div>
         <div className="flex gap-3 justify-center pt-2">
           {isEdit ? (
-            <Link href={`/admin/products/${initialProduct.id}/edit`} onClick={() => window.location.reload()}>
-              <Button variant="secondary">Keep Editing</Button>
-            </Link>
+            <Button variant="secondary" onClick={() => setSuccess(null)}>Keep Editing</Button>
           ) : (
             <Button variant="secondary" onClick={reset}>Add Another</Button>
           )}
@@ -211,8 +221,8 @@ export default function ProductForm({ initialProduct }) {
       {/* ── Basics ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="md:col-span-2">
-          <FieldLabel required>Title</FieldLabel>
-          <input type="text" value={form.title} maxLength={200}
+          <FieldLabel required htmlFor="title">Title</FieldLabel>
+          <input id="title" type="text" value={form.title} maxLength={200}
             onChange={(e) => handleChange('title', e.target.value)}
             placeholder="e.g. Ashwagandha Root Extract"
             className={inputCls(errors.title)} />
@@ -220,10 +230,10 @@ export default function ProductForm({ initialProduct }) {
         </div>
 
         <div>
-          <FieldLabel required>Price (INR)</FieldLabel>
+          <FieldLabel required htmlFor="amount">Price (INR)</FieldLabel>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brown/50 text-sm">₹</span>
-            <input type="number" min="0" step="0.01" value={form.amount}
+            <input id="amount" type="number" min="0" step="0.01" value={form.amount}
               onChange={(e) => handleChange('amount', e.target.value)}
               placeholder="0.00"
               className={cn(inputCls(errors.amount), 'pl-7')} />
@@ -232,8 +242,8 @@ export default function ProductForm({ initialProduct }) {
         </div>
 
         <div className="md:col-span-2">
-          <FieldLabel>Description</FieldLabel>
-          <textarea rows={3} value={form.description}
+          <FieldLabel htmlFor="description">Description</FieldLabel>
+          <textarea id="description" rows={3} value={form.description}
             onChange={(e) => handleChange('description', e.target.value)}
             placeholder="Describe the product…"
             className={cn(inputCls(errors.description), 'resize-none')} />
@@ -332,7 +342,7 @@ export default function ProductForm({ initialProduct }) {
             <div className="grid grid-cols-4 gap-3">
               {savedImages.map((img) => (
                 <div key={img.id} className="relative group aspect-square rounded-lg overflow-hidden border border-tan/30 bg-tan/10">
-                  <img src={img.url} alt="" className="w-full h-full object-cover" />
+                  <Image src={img.url} alt="" fill sizes="140px" className="object-cover" />
                   <button type="button" onClick={() => removeSavedImage(img)}
                     className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                     aria-label="Delete image">
@@ -342,12 +352,13 @@ export default function ProductForm({ initialProduct }) {
                 </div>
               ))}
               <AnimatePresence>
-                {newImages.map((img, idx) => (
-                  <motion.div key={img.file.name + idx}
+                {newImages.map((img) => (
+                  <motion.div key={img.id}
                     initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
                     className="relative group aspect-square rounded-lg overflow-hidden border border-sage/40">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- local data-URL preview, nothing to optimise */}
                     <img src={img.src} alt={img.file.name} className="w-full h-full object-cover" />
-                    <button type="button" onClick={() => setNewImages((p) => p.filter((_, i) => i !== idx))}
+                    <button type="button" onClick={() => setNewImages((p) => p.filter((x) => x.id !== img.id))}
                       className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                       aria-label="Remove image">
                       <X className="w-3 h-3" />
@@ -397,9 +408,9 @@ export default function ProductForm({ initialProduct }) {
 const subInputCls =
   'w-full px-3 py-2 text-sm bg-white border border-tan/50 rounded-lg text-gray-900 placeholder:text-brown/30 focus:outline-none focus:ring-2 focus:ring-sage/30 focus:border-sage transition-all';
 
-function FieldLabel({ children, required }) {
+function FieldLabel({ children, required, htmlFor }) {
   return (
-    <label className="block text-xs font-semibold text-ink/70 uppercase tracking-wider mb-1.5">
+    <label htmlFor={htmlFor} className="block text-xs font-semibold text-ink/70 uppercase tracking-wider mb-1.5">
       {children}{required && <span className="text-red-400 ml-0.5">*</span>}
     </label>
   );

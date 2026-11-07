@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, Pencil } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
 export default function ProductModal({ product, onClose }) {
@@ -63,11 +64,13 @@ export default function ProductModal({ product, onClose }) {
               {product.images.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
                   {product.images.map((img, i) => (
-                    <div key={img.id} className="aspect-square rounded-xl overflow-hidden border border-tan/20 bg-tan/10">
-                      <img
+                    <div key={img.id} className="relative aspect-square rounded-xl overflow-hidden border border-tan/20 bg-tan/10">
+                      <Image
                         src={img.url}
                         alt={`${product.title} image ${i + 1}`}
-                        className="w-full h-full object-cover"
+                        fill
+                        sizes="160px"
+                        className="object-cover"
                       />
                     </div>
                   ))}

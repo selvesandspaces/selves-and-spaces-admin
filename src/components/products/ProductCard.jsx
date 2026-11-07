@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { formatCurrency, cn } from '@/lib/utils';
 
@@ -9,6 +10,9 @@ export default function ProductCard({ product, selected, onSelect }) {
   return (
     <motion.div
       onClick={onSelect}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
       whileHover={{ y: -3, boxShadow: '0 8px 20px rgba(43,74,58,0.09)' }}
       transition={{ duration: 0.2 }}
       className={cn(
@@ -17,8 +21,8 @@ export default function ProductCard({ product, selected, onSelect }) {
       )}
     >
       {thumb && (
-        <div className="w-full aspect-video rounded-lg overflow-hidden bg-tan/10 border border-tan/20">
-          <img src={thumb} alt={product.title} className="w-full h-full object-cover" />
+        <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-tan/10 border border-tan/20">
+          <Image src={thumb} alt={product.title} fill sizes="(max-width: 1024px) 50vw, 25vw" className="object-cover" />
         </div>
       )}
 

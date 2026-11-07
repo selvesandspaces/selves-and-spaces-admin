@@ -16,7 +16,7 @@ const lora = Lora({
 
 export const metadata = {
   title: 'Selves & Spaces Admin',
-  description: 'Therapy Clinic Management System',
+  description: 'Store administration: orders, products and customers',
 };
 
 export default function RootLayout({ children }) {

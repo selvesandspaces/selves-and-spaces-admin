@@ -10,6 +10,7 @@ export async function proxy(request) {
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     {
+      cookieOptions: { httpOnly: true },
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -48,7 +49,10 @@ export async function proxy(request) {
   if (isProtected && !signedIn) return redirectTo('/login');
   // Already signed in as admin: skip the login form. Signed-in non-admins stay on /login
   // (the admin layout sends them back there, so redirecting them would loop).
-  if (pathname === '/login' && isAdmin) return redirectTo('/admin');
+  // `?error=` means we were just sent here for a reason, so show the form.
+  if (pathname === '/login' && isAdmin && !request.nextUrl.searchParams.has('error')) {
+    return redirectTo('/admin');
+  }
 
   return response;
 }

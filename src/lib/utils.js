@@ -2,28 +2,46 @@ export function cn(...classes) {
   return classes.filter(Boolean).join(' ');
 }
 
-export function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-IN', {
+const inr = (fractionDigits) =>
+  new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(amount);
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  });
+const inrWhole = inr(0);
+const inrPrecise = inr(2);
+
+// Whole amounts print without decimals (₹500); anything else keeps paise (₹499.50).
+export function formatCurrency(amount) {
+  const rounded = Math.round(Number(amount) * 100) / 100;
+  return Number.isInteger(rounded) ? inrWhole.format(rounded) : inrPrecise.format(rounded);
 }
 
+// Add money values without float drift (0.1 + 0.2): round to paise after each step.
+export function addMoney(a, b) {
+  return Math.round((a + b) * 100) / 100;
+}
+
+// One locale and timezone for every date, so server-rendered and hydrated text always match.
+const DATE_OPTS = { timeZone: 'Asia/Kolkata' };
+
 export function formatDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    month: 'short',
+  return new Date(dateStr).toLocaleDateString('en-IN', {
+    ...DATE_OPTS,
     day: 'numeric',
+    month: 'short',
     year: 'numeric',
   });
 }
 
 export function formatDateTime(dateStr) {
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    month: 'short',
+  return new Date(dateStr).toLocaleString('en-IN', {
+    ...DATE_OPTS,
     day: 'numeric',
+    month: 'short',
     year: 'numeric',
-    hour: '2-digit',
+    hour: 'numeric',
     minute: '2-digit',
   });
 }
@@ -60,4 +78,9 @@ export function timeAgo(dateStr) {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 2592000) return `${Math.floor(diff / 86400)}d ago`;
   return formatDate(dateStr);
+}
+
+// Orders use UUIDs; show the first block as a short reference.
+export function shortId(id) {
+  return String(id ?? '').slice(0, 8).toUpperCase();
 }

@@ -29,12 +29,16 @@ export default function ProductListPanel({ products }) {
           <div className="flex border border-tan/40 rounded-lg overflow-hidden ml-auto">
             <button
               onClick={() => setView('table')}
+              aria-label="Table view"
+              aria-pressed={view === 'table'}
               className={cn('p-2 transition-colors', view === 'table' ? 'bg-forest text-cream' : 'bg-white text-brown hover:bg-cream')}
             >
               <Table2 className="w-4 h-4" />
             </button>
             <button
               onClick={() => setView('grid')}
+              aria-label="Grid view"
+              aria-pressed={view === 'grid'}
               className={cn('p-2 transition-colors', view === 'grid' ? 'bg-forest text-cream' : 'bg-white text-brown hover:bg-cream')}
             >
               <LayoutGrid className="w-4 h-4" />

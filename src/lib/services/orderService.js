@@ -1,96 +1,83 @@
-import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api/client';
-import { orders as mockOrders } from '@/lib/mock-data/orders';
+import { cache } from 'react';
+import { apiGet, apiGetAll, apiPost } from '@/lib/api/client';
 
-// API response → app shape
-// API: { id, customer_id, customer_name, customer_email, order_date, status, total_amount,
-//        currency, payment_method, created_at,
-//        order_items: [{ id, order_id, product_id, products, quantity, unit_price, subtotal }] }
-// App: { id, customerId, customerName, status, items, subtotal, tax, total, createdAt, notes }
+// Delivery moves forward one step at a time; the API rejects anything else (409).
+export const DELIVERY_STATUSES = ['order_placed', 'in_transit', 'delivered'];
+export const NEXT_DELIVERY_STATUS = { order_placed: 'in_transit', in_transit: 'delivered' };
+
+// API: { id, customer{name,email,phone}, shipping_address{line1,line2,city,state,postal_code,country},
+//        items[{id,product_id,product_title,unit_price,quantity,line_total}], total_amount, paid_at,
+//        razorpay_order_id, razorpay_payment_id, delivery_status, in_transit_at, delivered_at,
+//        created_at, updated_at }
+// Orders only exist once paid, so there is no pending/cancelled state.
 function fromApi(o) {
-  const items = (o.order_items ?? []).map((item) => ({
-    productId: item.product_id ?? '',
-    productName: item.products?.name ?? '',
-    quantity: item.quantity,
-    unitPrice: item.unit_price,
-  }));
-
-  const total = o.total_amount ?? 0;
-  const tax = Math.round(total * 0.08 * 100) / 100; // Approximate — API stores total_amount as final
-  const subtotal = Math.round((total - tax) * 100) / 100;
-
+  const a = o.shipping_address ?? {};
   return {
     id: o.id,
-    customerId: o.customer_id ?? '',
-    customerName: o.customer_name ?? '',
-    status: o.status,
-    items,
-    subtotal,
-    tax,
-    total,
-    createdAt: o.order_date ?? o.created_at ?? '',
-    notes: o.data?.notes ?? '',
-  };
-}
-
-// App shape → API request body for create
-function toApiCreate(data) {
-  return {
-    customer_id: data.customerId || null,
-    customer_name: data.customerName || null,
-    customer_email: data.customerEmail || null,
-    status: data.status ?? 'pending',
-    total_amount: data.total,
-    currency: 'INR',
-    payment_method: data.paymentMethod || null,
-    items: (data.items ?? []).map((item) => ({
-      product_id: item.productId || null,
-      quantity: item.quantity,
-      unit_price: item.unitPrice,
+    customer: {
+      name: o.customer?.name ?? '',
+      email: o.customer?.email ?? '',
+      phone: o.customer?.phone ?? '',
+    },
+    shippingAddress: {
+      line1: a.line1 ?? '',
+      line2: a.line2 ?? '',
+      city: a.city ?? '',
+      state: a.state ?? '',
+      postalCode: a.postal_code ?? '',
+      country: a.country ?? '',
+    },
+    items: (o.items ?? []).map((i) => ({
+      id: i.id,
+      productId: i.product_id, // null once the product has been removed
+      productTitle: i.product_title,
+      unitPrice: Number(i.unit_price),
+      quantity: i.quantity,
+      lineTotal: Number(i.line_total),
     })),
+    total: Number(o.total_amount),
+    paidAt: o.paid_at,
+    razorpayOrderId: o.razorpay_order_id,
+    razorpayPaymentId: o.razorpay_payment_id,
+    deliveryStatus: o.delivery_status,
+    inTransitAt: o.in_transit_at,
+    deliveredAt: o.delivered_at,
+    createdAt: o.created_at,
   };
 }
 
-// App shape → API request body for update (only status + payment_method are patchable)
-function toApiUpdate(data) {
-  return {
-    status: data.status ?? null,
-    payment_method: data.paymentMethod ?? null,
-  };
-}
-
-export async function getOrders(filters = {}) {
-  const params = new URLSearchParams();
-  if (filters.customerId) params.set('customer_id', filters.customerId);
-  if (filters.status) params.set('status', filters.status);
-  const qs = params.toString();
-
-  const raw = await apiGet(`/orders/${qs ? `?${qs}` : ''}`);
-  if (!raw) return mockOrders;
+// De-duped within a request, so a layout and a page asking for the list share one fetch.
+export const getOrders = cache(async () => {
+  const raw = await apiGetAll('/admin/orders');
   return raw.map(fromApi);
+});
+
+// The few fields the list needs, so addresses and payment ids stay out of the client payload.
+export function toOrderSummary(o) {
+  return {
+    id: o.id,
+    customer: { name: o.customer.name, email: o.customer.email, phone: o.customer.phone },
+    total: o.total,
+    deliveryStatus: o.deliveryStatus,
+    createdAt: o.createdAt,
+  };
 }
 
 export async function getOrder(id) {
-  const raw = await apiGet(`/orders/${id}`);
-  if (!raw) return mockOrders.find((o) => o.id === id) ?? null;
-  return fromApi(raw);
+  try {
+    return fromApi(await apiGet(`/admin/orders/${id}`));
+  } catch (err) {
+    if (/not found/i.test(err.message)) return null;
+    throw err;
+  }
 }
 
-export async function getOrdersByCustomer(customerId) {
-  const raw = await apiGet(`/orders/?customer_id=${customerId}`);
-  if (!raw) return mockOrders.filter((o) => o.customerId === customerId);
-  return raw.map(fromApi);
+export async function updateDeliveryStatus(id, status) {
+  return fromApi(await apiPost(`/admin/orders/${id}/delivery-status`, { status }));
 }
 
-export async function createOrder(data) {
-  const raw = await apiPost('/orders/', toApiCreate(data));
-  return raw ? fromApi(raw) : null;
-}
-
-export async function updateOrder(id, data) {
-  const raw = await apiPatch(`/orders/${id}`, toApiUpdate(data));
-  return raw ? fromApi(raw) : null;
-}
-
-export async function deleteOrder(id) {
-  return await apiDelete(`/orders/${id}`);
+// The customers screen is being rebuilt separately; the API has no customer ids, so this
+// cannot match anything yet.
+export async function getOrdersByCustomer() {
+  return [];
 }

@@ -7,25 +7,28 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  defs,
-  linearGradient,
-  stop,
 } from 'recharts';
+import { addMoney } from '@/lib/utils';
 
-const data = [
-  { month: 'Sep', revenue: 420 },
-  { month: 'Oct', revenue: 680 },
-  { month: 'Nov', revenue: 540 },
-  { month: 'Dec', revenue: 890 },
-  { month: 'Jan', revenue: 720 },
-  { month: 'Feb', revenue: 1050 },
-  { month: 'Mar', revenue: 960 },
-  { month: 'Apr', revenue: 1240 },
-  { month: 'May', revenue: 1100 },
-  { month: 'Jun', revenue: 1380 },
-  { month: 'Jul', revenue: 1520 },
-  { month: 'Aug', revenue: 1680 },
-];
+// Revenue per calendar month for the last 12 months, from paid orders.
+function monthlyRevenue(orders) {
+  const now = new Date();
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+    return {
+      key: `${d.getFullYear()}-${d.getMonth()}`,
+      month: d.toLocaleDateString('en-US', { month: 'short' }),
+      revenue: 0,
+    };
+  });
+  const byKey = Object.fromEntries(months.map((m) => [m.key, m]));
+  orders.forEach((o) => {
+    const d = new Date(o.paidAt);
+    const m = byKey[`${d.getFullYear()}-${d.getMonth()}`];
+    if (m) m.revenue = addMoney(m.revenue, o.total);
+  });
+  return months;
+}
 
 function CustomTooltip({ active, payload, label }) {
   if (active && payload && payload.length) {
@@ -33,7 +36,7 @@ function CustomTooltip({ active, payload, label }) {
       <div className="bg-white border border-tan/30 rounded-lg shadow-lg px-3 py-2">
         <p className="text-xs text-brown/60">{label}</p>
         <p className="text-sm font-semibold text-forest">
-          ${payload[0].value.toLocaleString()}
+          ₹{payload[0].value.toLocaleString('en-IN')}
         </p>
       </div>
     );
@@ -41,7 +44,8 @@ function CustomTooltip({ active, payload, label }) {
   return null;
 }
 
-export default function RevenueChart() {
+export default function RevenueChart({ orders }) {
+  const data = monthlyRevenue(orders);
   return (
     <div className="bg-white rounded-xl p-5 border border-tan/30">
       <div className="flex items-center justify-between mb-4">
@@ -49,9 +53,6 @@ export default function RevenueChart() {
           <h3 className="text-sm font-semibold text-ink">Revenue</h3>
           <p className="text-xs text-brown/50">Last 12 months</p>
         </div>
-        <span className="text-xs font-medium text-moss bg-moss/10 px-2 py-1 rounded-full">
-          +24% this year
-        </span>
       </div>
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
@@ -71,7 +72,7 @@ export default function RevenueChart() {
             tick={{ fontSize: 11, fill: '#8B6B47', opacity: 0.6 }}
             axisLine={false}
             tickLine={false}
-            tickFormatter={(v) => `$${v}`}
+            tickFormatter={(v) => `₹${v}`}
           />
           <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#C4A882', strokeWidth: 1, strokeDasharray: '4 4' }} />
           <Area

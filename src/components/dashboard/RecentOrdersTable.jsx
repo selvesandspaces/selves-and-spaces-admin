@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Badge from '@/components/ui/Badge';
 import Avatar from '@/components/ui/Avatar';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, shortId } from '@/lib/utils';
 
 export default function RecentOrdersTable({ orders }) {
   const recent = [...orders]
@@ -24,13 +24,18 @@ export default function RecentOrdersTable({ orders }) {
           <thead>
             <tr className="border-b border-tan/20">
               <th className="text-left text-xs font-semibold text-brown/50 uppercase tracking-wider px-5 py-3">Order</th>
-              <th className="text-left text-xs font-semibold text-brown/50 uppercase tracking-wider px-5 py-3">Client</th>
+              <th className="text-left text-xs font-semibold text-brown/50 uppercase tracking-wider px-5 py-3">Customer</th>
               <th className="text-left text-xs font-semibold text-brown/50 uppercase tracking-wider px-5 py-3">Date</th>
               <th className="text-right text-xs font-semibold text-brown/50 uppercase tracking-wider px-5 py-3">Total</th>
               <th className="text-left text-xs font-semibold text-brown/50 uppercase tracking-wider px-5 py-3">Status</th>
             </tr>
           </thead>
           <tbody>
+            {recent.length === 0 && (
+              <tr>
+                <td colSpan={5} className="text-center text-sm text-brown/40 py-8">No orders yet.</td>
+              </tr>
+            )}
             {recent.map((order) => (
               <tr
                 key={order.id}
@@ -41,13 +46,13 @@ export default function RecentOrdersTable({ orders }) {
                     href={`/admin/orders/${order.id}`}
                     className="text-xs font-mono text-moss hover:text-forest font-medium"
                   >
-                    {order.id}
+                    #{shortId(order.id)}
                   </Link>
                 </td>
                 <td className="px-5 py-3">
                   <div className="flex items-center gap-2">
-                    <Avatar name={order.customerName} size="sm" />
-                    <span className="text-sm text-ink">{order.customerName}</span>
+                    <Avatar name={order.customer.name || '?'} size="sm" />
+                    <span className="text-sm text-ink">{order.customer.name}</span>
                   </div>
                 </td>
                 <td className="px-5 py-3 text-sm text-brown/60">
@@ -57,7 +62,7 @@ export default function RecentOrdersTable({ orders }) {
                   {formatCurrency(order.total)}
                 </td>
                 <td className="px-5 py-3">
-                  <Badge status={order.status} />
+                  <Badge status={order.deliveryStatus} />
                 </td>
               </tr>
             ))}

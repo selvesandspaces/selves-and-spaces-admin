@@ -1,6 +1,4 @@
-import { apiGet, apiPost, apiPatch, apiDelete, apiUpload } from '@/lib/api/client';
-
-const PAGE_SIZE = 100; // the API's maximum
+import { apiGet, apiGetAll, apiPost, apiPatch, apiDelete, apiUpload } from '@/lib/api/client';
 
 // API: { id, title, amount (decimal string), description, images[{id,url,position}],
 //        details[{id,title,subtitle,paragraph,position}], created_at, updated_at }
@@ -33,13 +31,7 @@ function toApi(data) {
 }
 
 export async function getProducts() {
-  const all = [];
-  for (let offset = 0; ; offset += PAGE_SIZE) {
-    const page = await apiGet(`/products?limit=${PAGE_SIZE}&offset=${offset}`);
-    all.push(...page);
-    if (page.length < PAGE_SIZE) break;
-  }
-  return all.map(fromApi);
+  return (await apiGetAll('/products')).map(fromApi);
 }
 
 export async function getProduct(id) {

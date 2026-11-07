@@ -21,6 +21,7 @@ export default function StatCard({ title, value, delta, icon: Icon, accentColor 
         <p className={cn('text-3xl font-serif font-semibold', accentColor)}>{value}</p>
         {delta && (
           <p
+            suppressHydrationWarning // labels like "placed 2h ago" depend on the current time
             className={cn(
               'flex items-center gap-1 text-xs mt-1',
               delta.positive ? 'text-moss' : 'text-red-500'

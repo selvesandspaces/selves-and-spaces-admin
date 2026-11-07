@@ -25,7 +25,7 @@ async function authHeaders() {
 
 async function request(method, path, { body, formData } = {}) {
   const headers = await authHeaders();
-  const options = { method, headers, cache: 'no-store' };
+  const options = { method, headers, cache: 'no-store', signal: AbortSignal.timeout(20000) };
 
   if (formData) {
     options.body = formData; // fetch sets the multipart boundary itself
@@ -37,8 +37,12 @@ async function request(method, path, { body, formData } = {}) {
   let res;
   try {
     res = await fetch(`${BASE_URL}${path}`, options);
-  } catch {
-    throw new Error('Could not reach the server. Make sure the API is running.');
+  } catch (err) {
+    throw new Error(
+      err?.name === 'TimeoutError'
+        ? 'The server took too long to respond. Please try again.'
+        : 'Could not reach the server. Make sure the API is running.'
+    );
   }
 
   if (res.status === 204) return null;
@@ -56,3 +60,21 @@ export const apiPost = (path, body) => request('POST', path, { body });
 export const apiPatch = (path, body) => request('PATCH', path, { body });
 export const apiDelete = (path) => request('DELETE', path);
 export const apiUpload = (path, formData) => request('POST', path, { formData });
+
+// Fetches every page of a list endpoint. Pages come in parallel batches; a short page ends the list.
+const PAGE_SIZE = 100; // the API's maximum
+const BATCH = 4;
+
+export async function apiGetAll(path) {
+  const sep = path.includes('?') ? '&' : '?';
+  const all = [];
+  for (let start = 0; ; start += BATCH) {
+    const pages = await Promise.all(
+      Array.from({ length: BATCH }, (_, i) =>
+        apiGet(`${path}${sep}limit=${PAGE_SIZE}&offset=${(start + i) * PAGE_SIZE}`)
+      )
+    );
+    for (const page of pages) all.push(...page);
+    if (pages.some((page) => page.length < PAGE_SIZE)) return all;
+  }
+}

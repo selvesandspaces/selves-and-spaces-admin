@@ -1,112 +1,43 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { Users, ShoppingBag, TrendingUp, Package } from 'lucide-react';
-import StatCard from './StatCard';
-import RevenueChart from './RevenueChart';
-import OrderStatusChart from './OrderStatusChart';
-import RecentOrdersTable from './RecentOrdersTable';
-import { formatCurrency } from '@/lib/utils';
+import { useState } from 'react';
+import dynamic from 'next/dynamic';
+import Tabs from '@/components/ui/Tabs';
+import OverviewTab from './OverviewTab';
 
-const staggerContainer = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.07 } },
-};
+// Overview is the landing view, so it stays eager; the other tabs load when first opened.
+const OrdersTab = dynamic(() => import('./OrdersTab'));
+const CrmTab = dynamic(() => import('./CrmTab'));
 
-const staggerItem = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
-};
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'orders', label: 'Orders' },
+  { id: 'crm', label: 'CRM' },
+];
 
-export default function DashboardClient({ customers, orders, products }) {
-  const totalRevenue = orders
-    .filter((o) => o.status === 'completed')
-    .reduce((sum, o) => sum + o.total, 0);
+export default function DashboardClient({ orders, products, initialTab = 'overview' }) {
+  const [tab, setTab] = useState(TABS.some((t) => t.id === initialTab) ? initialTab : 'overview');
 
-  const activeOrders = orders.filter(
-    (o) => o.status === 'pending' || o.status === 'processing'
-  ).length;
-
-  const activeCustomers = customers.filter((c) => c.status === 'active').length;
-
-  const stats = [
-    {
-      title: 'Total Clients',
-      value: customers.length.toString(),
-      delta: { label: `${activeCustomers} active`, positive: true },
-      icon: Users,
-      accentColor: 'text-forest',
-    },
-    {
-      title: 'Active Orders',
-      value: activeOrders.toString(),
-      delta: { label: 'pending + processing', positive: activeOrders > 0 },
-      icon: ShoppingBag,
-      accentColor: 'text-moss',
-    },
-    {
-      title: 'Total Revenue',
-      value: formatCurrency(totalRevenue),
-      delta: { label: '+24% this year', positive: true },
-      icon: TrendingUp,
-      accentColor: 'text-brown',
-    },
-    {
-      title: 'Products',
-      value: products.length.toString(),
-      delta: { label: 'in catalogue', positive: true },
-      icon: Package,
-      accentColor: 'text-lavender',
-    },
-  ];
+  function changeTab(id) {
+    setTab(id);
+    // Keep the tab in the URL so it survives a refresh and can be linked to, without a navigation.
+    window.history.replaceState(null, '', id === 'overview' ? '/admin' : `/admin?tab=${id}`);
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-screen-xl mx-auto">
-      {/* Header */}
       <div>
         <h2 className="text-xl font-serif font-semibold text-ink">Dashboard</h2>
         <p className="text-sm text-brown/60 mt-0.5">
-          Welcome back — here&apos;s your clinic overview.
+          Welcome back — here&apos;s how things are going.
         </p>
       </div>
 
-      {/* Stat cards */}
-      <motion.div
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
-        className="grid grid-cols-2 lg:grid-cols-4 gap-4"
-      >
-        {stats.map((stat) => (
-          <motion.div key={stat.title} variants={staggerItem}>
-            <StatCard {...stat} />
-          </motion.div>
-        ))}
-      </motion.div>
+      <Tabs tabs={TABS} active={tab} onChange={changeTab} />
 
-      {/* Charts */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.35 }}
-        className="grid grid-cols-1 lg:grid-cols-3 gap-4"
-      >
-        <div className="lg:col-span-2">
-          <RevenueChart />
-        </div>
-        <div>
-          <OrderStatusChart orders={orders} />
-        </div>
-      </motion.div>
-
-      {/* Recent orders */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.42, duration: 0.35 }}
-      >
-        <RecentOrdersTable orders={orders} />
-      </motion.div>
+      {tab === 'overview' && <OverviewTab orders={orders} products={products} />}
+      {tab === 'orders' && <OrdersTab orders={orders} />}
+      {tab === 'crm' && <CrmTab />}
     </div>
   );
 }

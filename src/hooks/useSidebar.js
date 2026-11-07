@@ -1,30 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
-export function useSidebar() {
-  const [collapsed, setCollapsed] = useState(false);
-  const [mounted, setMounted] = useState(false);
+export const SIDEBAR_COOKIE = 'ss-sidebar-collapsed';
 
-  useEffect(() => {
-    setMounted(true);
-    const saved = localStorage.getItem('ss-sidebar-collapsed');
-    if (saved !== null) {
-      try {
-        setCollapsed(JSON.parse(saved));
-      } catch {
-        // ignore
-      }
-    }
-  }, []);
+// `initialCollapsed` comes from the cookie read on the server, so the first paint is already right.
+export function useSidebar(initialCollapsed = false) {
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
 
   const toggle = () => {
     setCollapsed((prev) => {
       const next = !prev;
-      localStorage.setItem('ss-sidebar-collapsed', JSON.stringify(next));
+      document.cookie = `${SIDEBAR_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
       return next;
     });
   };
 
-  return { collapsed, toggle, mounted };
+  return { collapsed, toggle };
 }
