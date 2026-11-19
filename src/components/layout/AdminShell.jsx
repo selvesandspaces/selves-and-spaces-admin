@@ -7,9 +7,10 @@ import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 
 const TITLES = {
-  '/admin/customers': 'Clients',
+  '/admin/clients': 'Clients',
   '/admin/orders': 'Orders',
   '/admin/products': 'Products',
+  '/admin/settings': 'Settings',
   '/admin': 'Dashboard',
 };
 

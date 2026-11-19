@@ -52,6 +52,10 @@ export async function updateProduct(id, data) {
 }
 
 // Returns { id, url, position }. The API takes one file per request (multipart field "file").
+export async function deleteProduct(id) {
+  return apiDelete(`/products/${id}`);
+}
+
 export async function uploadProductImage(id, file) {
   const formData = new FormData();
   formData.append('file', file);

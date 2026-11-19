@@ -26,6 +26,7 @@ export const getSessionState = cache(async () => {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   if (!data?.claims) return { state: 'anon' };
+  const profileName = data.claims.user_metadata?.name;
 
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
@@ -43,7 +44,7 @@ export const getSessionState = cache(async () => {
     user: {
       id: me.id,
       email: me.email,
-      name: me.email?.split('@')[0] ?? 'Admin',
+      name: profileName || me.email?.split('@')[0] || 'Admin',
       role: 'admin',
     },
   };

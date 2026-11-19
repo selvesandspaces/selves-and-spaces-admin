@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { User, Package, MapPin, CreditCard, Truck, Check, Mail, Phone } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { formatCurrency, formatDateTime, shortId, cn } from '@/lib/utils';
 import { updateDeliveryStatusAction } from '@/lib/actions/orderActions';
 
@@ -18,16 +19,20 @@ export default function OrderDetail({ order: initialOrder }) {
   const [order, setOrder] = useState(initialOrder);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [confirming, setConfirming] = useState(false);
 
   const next = NEXT_ACTION[order.deliveryStatus];
 
   async function advance() {
-    if (!window.confirm(`${next.label}? Delivery can only move forward and this cannot be undone.`)) return;
     setSaving(true);
     setError(null);
     const res = await updateDeliveryStatusAction(order.id, next.status);
-    if (res.ok) setOrder(res.data);
-    else setError(res.error);
+    if (res.ok) {
+      setOrder(res.data);
+      setConfirming(false);
+    } else {
+      setError(res.error);
+    }
     setSaving(false);
   }
 
@@ -85,13 +90,24 @@ export default function OrderDetail({ order: initialOrder }) {
           </ol>
           {next && (
             <div className="mt-4 pt-4 border-t border-tan/20 flex items-center gap-3">
-              <Button variant="primary" onClick={advance} disabled={saving}>
-                {saving ? 'Updating…' : next.label}
+              <Button variant="primary" onClick={() => setConfirming(true)} disabled={saving}>
+                {next.label}
               </Button>
-              {error && <p className="text-sm text-red-600">{error}</p>}
             </div>
           )}
         </Card>
+
+        <ConfirmDialog
+          open={confirming}
+          title={next ? `${next.label}?` : ''}
+          confirmLabel="Yes, update"
+          busy={saving}
+          error={error}
+          onConfirm={advance}
+          onCancel={() => { setConfirming(false); setError(null); }}
+        >
+          Delivery can only move forward one step at a time, so this cannot be undone.
+        </ConfirmDialog>
 
         {/* Items */}
         <div className="bg-white rounded-xl border border-tan/30 overflow-hidden">

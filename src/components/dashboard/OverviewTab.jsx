@@ -22,7 +22,7 @@ export default function OverviewTab({ orders, products }) {
   const toShip = orders.filter((o) => o.deliveryStatus === 'order_placed').length;
   const inTransit = orders.filter((o) => o.deliveryStatus === 'in_transit').length;
 
-  // The API has no customer list; count distinct buyers from the orders themselves.
+  // Distinct buyers across all orders (not the same as the clients list shown under CRM).
   const customerCount = new Set(
     orders.map((o) => (o.customer.email || o.customer.phone || o.customer.name).toLowerCase())
   ).size;

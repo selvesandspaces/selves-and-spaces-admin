@@ -9,6 +9,6 @@ export async function GET(request) {
 
   const reason = request.nextUrl.searchParams.get('reason');
   const url = new URL('/login', request.url);
-  if (reason === 'forbidden' || reason === 'expired') url.searchParams.set('error', reason);
+  if (['forbidden', 'expired', 'reauth'].includes(reason)) url.searchParams.set('error', reason);
   return NextResponse.redirect(url);
 }

@@ -7,6 +7,7 @@ import {
   ShoppingBag,
   Package,
   Leaf,
+  Settings,
   ChevronRight,
   LogOut,
 } from 'lucide-react';
@@ -18,10 +19,12 @@ import { logout } from '@/lib/auth';
 const NAV = [
   { type: 'item', href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { type: 'section', label: 'CUSTOMERS' },
-  { type: 'item', href: '/admin/customers', label: 'Clients', icon: Users },
+  { type: 'item', href: '/admin/clients', label: 'Clients', icon: Users },
   { type: 'section', label: 'SALES' },
   { type: 'item', href: '/admin/orders', label: 'Orders', icon: ShoppingBag },
   { type: 'item', href: '/admin/products', label: 'Products', icon: Package },
+  { type: 'section', label: 'ACCOUNT' },
+  { type: 'item', href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
 function NavItem({ item, collapsed }) {

@@ -75,9 +75,3 @@ export async function getOrder(id) {
 export async function updateDeliveryStatus(id, status) {
   return fromApi(await apiPost(`/admin/orders/${id}/delivery-status`, { status }));
 }
-
-// The customers screen is being rebuilt separately; the API has no customer ids, so this
-// cannot match anything yet.
-export async function getOrdersByCustomer() {
-  return [];
-}

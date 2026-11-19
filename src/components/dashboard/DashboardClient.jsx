@@ -15,7 +15,7 @@ const TABS = [
   { id: 'crm', label: 'CRM' },
 ];
 
-export default function DashboardClient({ orders, products, initialTab = 'overview' }) {
+export default function DashboardClient({ orders, products, crm, initialTab = 'overview' }) {
   const [tab, setTab] = useState(TABS.some((t) => t.id === initialTab) ? initialTab : 'overview');
 
   function changeTab(id) {
@@ -37,7 +37,7 @@ export default function DashboardClient({ orders, products, initialTab = 'overvi
 
       {tab === 'overview' && <OverviewTab orders={orders} products={products} />}
       {tab === 'orders' && <OrdersTab orders={orders} />}
-      {tab === 'crm' && <CrmTab />}
+      {tab === 'crm' && <CrmTab stats={crm} />}
     </div>
   );
 }

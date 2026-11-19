@@ -7,12 +7,15 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { cn } from '@/lib/utils';
+import { parseDetailText, serializeDetailText, MAX_PARAGRAPH } from '@/lib/detailText';
 import {
   createProductAction,
   updateProductAction,
   uploadProductImageAction,
   deleteProductImageAction,
+  deleteProductAction,
 } from '@/lib/actions/productActions';
 
 // Limits mirror the API (ProductCreate / DetailIn).
@@ -20,12 +23,11 @@ const MAX_DETAILS = 50;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 let seq = 0;
-const newDetail = (d = {}) => ({
-  key: `d_${seq++}`,
-  title: d.title ?? '',
-  subtitle: d.subtitle ?? '',
-  paragraph: d.paragraph ?? '',
-});
+// A section's text is an optional intro plus bullet points; detailText.js (de)serialises it.
+const newDetail = (d = {}) => {
+  const { intro, items } = parseDetailText(d.paragraph ?? '');
+  return { key: `d_${seq++}`, title: d.title ?? '', subtitle: d.subtitle ?? '', intro, items };
+};
 
 export default function ProductForm({ initialProduct }) {
   const isEdit = !!initialProduct;
@@ -43,6 +45,10 @@ export default function ProductForm({ initialProduct }) {
   const [savedImages, setSavedImages] = useState(initialProduct?.images ?? []);
   const [newImages, setNewImages] = useState([]); // [{ id, file, src }]
   const [imageNotice, setImageNotice] = useState(null);
+  const [imageToDelete, setImageToDelete] = useState(null); // saved image awaiting confirmation
+  const [confirmingProductDelete, setConfirmingProductDelete] = useState(false);
+  const [busyDelete, setBusyDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
   const fileRef = useRef(null);
 
   const [submitting, setSubmitting] = useState(false);
@@ -61,10 +67,11 @@ export default function ProductForm({ initialProduct }) {
     if (form.amount === '' || isNaN(form.amount) || Number(form.amount) < 0)
       e.amount = 'Enter a valid price (0 or more).';
     if (form.description.length > 10000) e.description = 'Description is too long (max 10,000 characters).';
-    const badDetail = details.findIndex((d) => !d.title.trim() || !d.paragraph.trim());
-    if (badDetail !== -1) e.details = `Section ${badDetail + 1} needs a title and a paragraph.`;
+    const badDetail = details.findIndex((d) => !d.title.trim() || !serializeDetailText(d));
+    if (badDetail !== -1) e.details = `Section ${badDetail + 1} needs a title and some text or points.`;
     if (details.some((d) => d.subtitle.length > 200)) e.details = 'Subtitles must be 200 characters or fewer.';
-    if (details.some((d) => d.paragraph.length > 5000)) e.details = 'Paragraphs must be 5,000 characters or fewer.';
+    if (details.some((d) => serializeDetailText(d).length > MAX_PARAGRAPH))
+      e.details = `A section's text and points must total ${MAX_PARAGRAPH.toLocaleString()} characters or fewer.`;
     return e;
   }
 
@@ -101,11 +108,35 @@ export default function ProductForm({ initialProduct }) {
     });
   }
 
-  async function removeSavedImage(image) {
-    if (!window.confirm('Delete this image? This cannot be undone.')) return;
-    const res = await deleteProductImageAction(initialProduct.id, image.id);
-    if (res.ok) setSavedImages((p) => p.filter((i) => i.id !== image.id));
-    else setImageNotice(res.error);
+  async function removeSavedImage() {
+    setBusyDelete(true);
+    setDeleteError(null);
+    const res = await deleteProductImageAction(initialProduct.id, imageToDelete.id);
+    setBusyDelete(false);
+    if (res.ok) {
+      setSavedImages((p) => p.filter((i) => i.id !== imageToDelete.id));
+      setImageToDelete(null);
+    } else {
+      setDeleteError(res.error);
+    }
+  }
+
+  async function removeProduct() {
+    setBusyDelete(true);
+    setDeleteError(null);
+    const res = await deleteProductAction(initialProduct.id);
+    if (res.ok) {
+      router.push('/admin/products');
+    } else {
+      setBusyDelete(false);
+      setDeleteError(res.error);
+    }
+  }
+
+  function closeDeleteDialogs() {
+    setImageToDelete(null);
+    setConfirmingProductDelete(false);
+    setDeleteError(null);
   }
 
   // ── Submit ────────────────────────────────────────────────────
@@ -121,7 +152,11 @@ export default function ProductForm({ initialProduct }) {
       title: form.title,
       amount: form.amount,
       description: form.description,
-      details,
+      details: details.map((d) => ({
+        title: d.title,
+        subtitle: d.subtitle,
+        paragraph: serializeDetailText(d),
+      })),
     };
 
     const saved = isEdit
@@ -257,7 +292,7 @@ export default function ProductForm({ initialProduct }) {
           <div>
             <p className="text-sm font-semibold text-ink">Product details</p>
             <p className="text-xs text-brown/50 mt-0.5">
-              Sections shown on the product page, each with a title, optional subtitle and a paragraph (up to {MAX_DETAILS}).
+              Sections shown on the product page, each with a title, optional subtitle, text and bullet points (up to {MAX_DETAILS}).
             </p>
           </div>
           <button type="button"
@@ -303,9 +338,36 @@ export default function ProductForm({ initialProduct }) {
                 <input type="text" value={d.subtitle} maxLength={200}
                   onChange={(e) => updateDetail(d.key, 'subtitle', e.target.value)}
                   placeholder="Subtitle (optional)" className={subInputCls} />
-                <textarea rows={3} value={d.paragraph} maxLength={5000}
-                  onChange={(e) => updateDetail(d.key, 'paragraph', e.target.value)}
-                  placeholder="Paragraph" className={cn(subInputCls, 'resize-none')} />
+                <textarea rows={2} value={d.intro} maxLength={MAX_PARAGRAPH}
+                  onChange={(e) => updateDetail(d.key, 'intro', e.target.value)}
+                  placeholder="Text (optional if you add points)" className={cn(subInputCls, 'resize-none')} />
+
+                <div className="space-y-2 pt-1">
+                  {d.items.map((item, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <span className="w-1.5 h-1.5 rounded-full bg-sage shrink-0 mx-1.5" />
+                      <input type="text" value={item}
+                        onChange={(e) => updateDetail(d.key, 'items', d.items.map((x, j) => (j === i ? e.target.value : x)))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            updateDetail(d.key, 'items', [...d.items.slice(0, i + 1), '', ...d.items.slice(i + 1)]);
+                          }
+                        }}
+                        placeholder="Point" aria-label={`Point ${i + 1}`} className={cn(subInputCls, 'flex-1')} />
+                      <button type="button"
+                        onClick={() => updateDetail(d.key, 'items', d.items.filter((_, j) => j !== i))}
+                        className="text-brown/30 hover:text-red-400 transition-colors" aria-label={`Remove point ${i + 1}`}>
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button"
+                    onClick={() => updateDetail(d.key, 'items', [...d.items, ''])}
+                    className="text-xs text-sage hover:text-forest flex items-center gap-1 transition-colors">
+                    <Plus className="w-3 h-3" /> Add point
+                  </button>
+                </div>
               </motion.div>
             ))}
           </AnimatePresence>
@@ -343,7 +405,7 @@ export default function ProductForm({ initialProduct }) {
               {savedImages.map((img) => (
                 <div key={img.id} className="relative group aspect-square rounded-lg overflow-hidden border border-tan/30 bg-tan/10">
                   <Image src={img.url} alt="" fill sizes="140px" className="object-cover" />
-                  <button type="button" onClick={() => removeSavedImage(img)}
+                  <button type="button" onClick={() => setImageToDelete(img)}
                     className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                     aria-label="Delete image">
                     <X className="w-3 h-3" />
@@ -399,6 +461,46 @@ export default function ProductForm({ initialProduct }) {
           {submitting ? 'Saving…' : isEdit ? 'Update Product' : 'Save Product'}
         </Button>
       </div>
+
+      {isEdit && (
+        <div className="border border-red-200 bg-red-50/40 rounded-xl p-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-ink">Delete this product</p>
+            <p className="text-xs text-brown/60 mt-0.5">
+              Removes the product, its details and its images. Past orders keep their record.
+            </p>
+          </div>
+          <Button type="button" variant="danger" onClick={() => setConfirmingProductDelete(true)}>
+            Delete product
+          </Button>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!imageToDelete}
+        title="Delete this image?"
+        confirmLabel="Delete image"
+        danger
+        busy={busyDelete}
+        error={deleteError}
+        onConfirm={removeSavedImage}
+        onCancel={closeDeleteDialogs}
+      >
+        The image is removed from the product straight away. This cannot be undone.
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={confirmingProductDelete}
+        title={`Delete “${initialProduct?.title ?? ''}”?`}
+        confirmLabel="Delete product"
+        danger
+        busy={busyDelete}
+        error={deleteError}
+        onConfirm={removeProduct}
+        onCancel={closeDeleteDialogs}
+      >
+        Its details and images are permanently removed. Past orders keep their record of it.
+      </ConfirmDialog>
     </form>
   );
 }

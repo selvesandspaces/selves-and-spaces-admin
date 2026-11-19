@@ -1,13 +1,40 @@
 'use client';
 
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Pencil } from 'lucide-react';
+import { X, Calendar, Pencil, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { parseDetailText } from '@/lib/detailText';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { deleteProductAction } from '@/lib/actions/productActions';
 
 export default function ProductModal({ product, onClose }) {
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+
+  function closeDialog() {
+    setConfirming(false);
+    setDeleteError(null);
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    const res = await deleteProductAction(product.id);
+    setDeleting(false);
+    if (res.ok) {
+      closeDialog();
+      onClose(); // the action revalidates the list, so the product disappears from it
+    } else {
+      setDeleteError(res.error);
+    }
+  }
+
   return (
+    <>
     <AnimatePresence>
       {product && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -49,7 +76,16 @@ export default function ProductModal({ product, onClose }) {
                   <Pencil className="w-4 h-4" />
                 </Link>
                 <button
+                  onClick={() => setConfirming(true)}
+                  className="p-2 rounded-lg text-brown/40 hover:text-red-600 hover:bg-red-50 transition-colors"
+                  title="Delete product"
+                  aria-label="Delete product"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                <button
                   onClick={onClose}
+                  aria-label="Close"
                   className="p-2 rounded-lg text-brown/40 hover:text-ink hover:bg-tan/20 transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -90,12 +126,25 @@ export default function ProductModal({ product, onClose }) {
               )}
 
               {/* Detail sections */}
-              {product.details.map((d) => (
-                <Section key={d.id} title={d.title}>
-                  {d.subtitle && <p className="text-sm font-medium text-ink mb-1">{d.subtitle}</p>}
-                  <p className="text-sm text-ink/80 leading-relaxed whitespace-pre-line">{d.paragraph}</p>
-                </Section>
-              ))}
+              {product.details.map((d) => {
+                const { intro, items } = parseDetailText(d.paragraph);
+                return (
+                  <Section key={d.id} title={d.title}>
+                    {d.subtitle && <p className="text-sm font-medium text-ink mb-1">{d.subtitle}</p>}
+                    {intro && <p className="text-sm text-ink/80 leading-relaxed whitespace-pre-line">{intro}</p>}
+                    {items.length > 0 && (
+                      <ul className={`space-y-1.5 ${intro ? 'mt-2' : ''}`}>
+                        {items.map((item, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-ink/80">
+                            <span className="w-1.5 h-1.5 rounded-full bg-sage mt-1.5 shrink-0" />
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </Section>
+                );
+              })}
 
               {/* Meta */}
               {product.createdAt && (
@@ -109,6 +158,19 @@ export default function ProductModal({ product, onClose }) {
         </div>
       )}
     </AnimatePresence>
+    <ConfirmDialog
+      open={confirming}
+      title={`Delete “${product?.title ?? ''}”?`}
+      confirmLabel="Delete product"
+      danger
+      busy={deleting}
+      error={deleteError}
+      onConfirm={handleDelete}
+      onCancel={closeDialog}
+    >
+      Its details and images are permanently removed. Past orders keep their record of it.
+    </ConfirmDialog>
+    </>
   );
 }
 

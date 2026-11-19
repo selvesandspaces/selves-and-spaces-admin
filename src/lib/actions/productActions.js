@@ -6,6 +6,7 @@ import {
   updateProduct,
   uploadProductImage,
   deleteProductImage,
+  deleteProduct,
 } from '@/lib/services/productService';
 import { isAdminRequest } from '@/lib/session';
 
@@ -42,4 +43,12 @@ export async function deleteProductImageAction(id, imageId) {
   const result = await run(() => deleteProductImage(id, imageId));
   if (result.ok) revalidatePath('/admin/products');
   return result;
+}
+
+export async function deleteProductAction(id) {
+  const result = await run(() => deleteProduct(id));
+  // Already gone (deleted elsewhere) is the outcome the admin wanted.
+  const gone = result.ok || /not found/i.test(result.error ?? '');
+  if (gone) revalidatePath('/admin/products');
+  return gone ? { ok: true } : result;
 }

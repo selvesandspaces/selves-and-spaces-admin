@@ -1,7 +1,7 @@
 'use client';
 
 import { Menu } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import Link from 'next/link';
 import Avatar from '@/components/ui/Avatar';
 
 export default function Topbar({ title, user, onMenuToggle }) {
@@ -24,13 +24,17 @@ export default function Topbar({ title, user, onMenuToggle }) {
       <div className="flex-1" />
 
       {/* User info */}
-      <div className="flex items-center gap-2.5">
+      <Link
+        href="/admin/settings"
+        aria-label="Account settings"
+        className="flex items-center gap-2.5 rounded-lg p-1 -m-1 hover:bg-blush/60 transition-colors"
+      >
         <Avatar name={user?.name ?? 'Admin'} size="sm" />
         <div className="hidden sm:block">
           <p className="text-xs font-medium text-ink leading-tight">{user?.name}</p>
           <p className="text-xs text-brown/50 capitalize leading-tight">{user?.role}</p>
         </div>
-      </div>
+      </Link>
     </header>
   );
 }
